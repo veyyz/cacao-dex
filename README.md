@@ -36,24 +36,32 @@ Decentralized Exchange for ERC20 using Truffle, React, and @web3-react
 - Start MetaMask with the wallet seed mnemonic provided by ganache
 - Browse to local react development server (ex. localhost:3000)
 
-```js
+### Contract Initialization
+
 On first run, contract will need to be initialized with approved trading pairs
+
 - In MetaMask, select "Account 1" or the account that you deployed the contract with.
-- If you selected the right account you will see a button that says "Initialize Contract"
+- You should see "(admin)" next to the account address and a button that says "Initialize Contract"
 - Otherwise you will see a message reading "Only admin can initialize the Dex Contract"
-```
+
+### Fund Wallets and Trade
 
 - Now you can select any account in MetaMask to start placing buy and sell orders on the Dex
-- 1. Click "Fund" to fund your local wallet (MetaMask) with tokens from the faucet method of the mock ERC20 contract.
-- 2. Click "Approve" to approve the Dex to transfer your tokens to the smart contract.
-- 3. Click "Deposit" to initiate the transfer of your tokens to the smart contract.
-- 4. Repeat the above steps to fund several accounts with different tokens.
-- 5. Place any number of coorresponding LIMIT and MARKET orders until your heart is content.
-- 6. When you're satisfied with your gains, you can click "Withdraw" to move your tokens from the smart contract back to your local wallet (MetaMask)
 
-```js
-To see your token balances in MetaMask click on "Add Tokens" then click "Custom Token" in and enter the contract address of the deployed Mock ERC20 token. Click "Next" and then "Add Tokens".
-```
+1. Click "Fund" to fund your local wallet (MetaMask) with tokens from the faucet method of the mock ERC20 contract.
+2. Click "Approve" to approve the Dex to transfer your tokens to the smart contract.
+3. Click "Deposit" to initiate the transfer of your tokens to the smart contract.
+4. Repeat the above steps to fund several accounts with different tokens.
+5. Place any number of coorresponding LIMIT and MARKET orders until your heart is content.
+6. When you're satisfied with your gains, you can click "Withdraw" to move your tokens from the smart contract back to your local wallet (MetaMask)
+
+### See Token Balances in MetaMask
+
+To see your token balances in MetaMask:
+
+1. Click "Add Tokens" and "Custom Token"
+2. Enter the contract address of the deployed Mock ERC20 token
+3. Click "Next" and "Add Tokens".
 
 ## Features
 
@@ -61,12 +69,13 @@ To see your token balances in MetaMask click on "Add Tokens" then click "Custom 
 
 - Approve Trading Pairs
 - Seed Wallets from Faucet
+- Admin UI Trimming
 
 ### Wallet
 
 - Approve Dex to transferFrom
-- Deposit Tokens
-- withdraw tokens
+- Deposit Tokens to Contract
+- Withdraw tokens to Local Wallet
 
 ### Order Book
 

@@ -20,7 +20,7 @@ console.log({ supportedNetworks });
 const { InjectedConnector, NetworkOnlyConnector } = Connectors;
 const MetaMask = new InjectedConnector({ supportedNetworks });
 const Infura = new NetworkOnlyConnector({
-  providerURL: "https://mainnet.infura.io/v3/<INFURA_PROJECT_ID>",
+  providerURL: "https://mainnet.infura.io/v3/727fb6ad8d4449a18315a17a79131cc7",
 });
 const connectors = { MetaMask, Infura };
 

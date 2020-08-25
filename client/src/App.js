@@ -19,13 +19,14 @@ const initialBalances = Object.freeze({
 const App = () => {
   // contract reference and state
   const [dex, setDex] = useState(undefined);
+  const [dexAdmin, setDexAdmin] = useState();
   const [approvedTickers, setApprovedTickers] = useState([]);
   const [currTicker, setCurrTicker] = useState(undefined);
-  // order book
+
+  // order book & balances
   const [currSide, setCurrSide] = useState("Limit");
   const [currBuys, setCurrBuys] = useState([]);
   const [currSells, setCurrSells] = useState([]);
-
   const [localBalances, setLocalBalances] = useState({ ...initialBalances });
   const [dexBalances, setDexBalances] = useState({ ...initialBalances });
 
@@ -49,7 +50,8 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    const LoadContracts = async () => {
+    const loadContracts = async () => {
+      console.log("loadContracts()");
       if (
         error &&
         (error.code === "UNSUPPORTED_NETWORK" ||
@@ -58,7 +60,7 @@ const App = () => {
         return (
           <div className="App">
             Infura service unavailable. Please connect an injected wallet
-            provider such as MetaMask
+            provider such as MetaMask.
           </div>
         );
       }
@@ -110,18 +112,27 @@ const App = () => {
         console.error(error);
       }
     };
-    LoadContracts();
+    loadContracts();
   }, [context]);
 
-  // check dex contract is loaded to get list of approved tokens
-  // delay balance updates until all token contracts are loaded
+  // update list of approved tokens on dex is loaded
   useEffect(() => {
-    const effect = async () => {
-      if (dex && dex.options.address != 0) await getApprovedTokens();
-      if (dai && bat && rep && zrx) await updateBalances();
+    const getAdmin = async () => {
+      try {
+        const _dexAdmin = await dex.methods.admin().call();
+        setDexAdmin(_dexAdmin);
+      } catch (e) {
+        console.error("Error getting Dex Admin:", e.message);
+      }
     };
-    effect();
-  }, [library, account, dex, dai, bat, rep, zrx]);
+    if (dex && !dexAdmin) getAdmin();
+    if (dex && dex.options.address) updateTokenList();
+  }, [dex]);
+
+  // update token balances after token contracts are loaded
+  useEffect(() => {
+    // if (dai && bat && rep && zrx) updateBalances();
+  }, [dai, bat, rep, zrx]);
 
   // update orderbook when currTicker changes
   useEffect(() => {
@@ -130,41 +141,53 @@ const App = () => {
 
   // admin only method - run on dex initialization only
   async function approveTokens() {
-    try {
-      await Promise.all(
-        dex.methods
-          .addToken(library.utils.fromAscii("DAI"), dai.options.address)
-          .send({ from: account }),
-        dex.methods
-          .addToken(library.utils.fromAscii("BAT"), bat.options.address)
-          .send({ from: account }),
-        dex.methods
-          .addToken(library.utils.fromAscii("REP"), rep.options.address)
-          .send({ from: account }),
-        dex.methods
-          .addToken(library.utils.fromAscii("ZRX"), zrx.options.address)
-          .send({ from: account })
+    console.log("approveTokens()");
+    await Promise.all([
+      dex.methods
+        .addToken(library.utils.fromAscii("BAT"), bat.options.address)
+        .send({ from: account }),
+      dex.methods
+        .addToken(library.utils.fromAscii("REP"), rep.options.address)
+        .send({ from: account }),
+      dex.methods
+        .addToken(library.utils.fromAscii("ZRX"), zrx.options.address)
+        .send({ from: account }),
+      dex.methods
+        .addToken(library.utils.fromAscii("DAI"), dai.options.address)
+        .send({ from: account }),
+    ])
+      .then(() => updateTokenList())
+      .catch((e) =>
+        console.log(
+          "Error approving trading pairs on dex contract: ",
+          e.message
+        )
       );
-    } catch (e) {
-      console.log("ignore: ", e.message);
-    }
   }
 
   // called on app initialization to get approved trading pairs and set current
-  async function getApprovedTokens() {
-    const _approvedTickers = [];
-    const _tickers = await dex.methods.getTokenList().call();
-    // console.log(_tickers);
-    _tickers.map((_ticker) =>
-      _approvedTickers.push(
-        library.utils.toAscii(_ticker[0]).replace(/\u0000/g, "")
-      )
-    );
-    setApprovedTickers([..._approvedTickers]);
-    setCurrTicker(_approvedTickers[0]);
+  async function updateTokenList() {
+    console.log("updateTokenList()", { dex });
+    try {
+      const _approvedTickers = [];
+      const _tickers = await dex.methods.getTokenList().call();
+      console.log({ _tickers });
+      _tickers.map((_ticker) =>
+        _approvedTickers.push(
+          library.utils.toAscii(_ticker[0]).replace(/\u0000/g, "")
+        )
+      );
+      setApprovedTickers([..._approvedTickers]);
+      setCurrTicker(_approvedTickers[0]);
+    } catch (e) {
+      console.error(
+        "RPC Error: Contract uninitialized. You can safely ignore this error. Please initiaze Dex Contract to continue."
+      );
+    }
   }
 
   async function updateBalances() {
+    console.log("updateBalances()");
     let _balances = { ...initialBalances };
     let _dexBalances = { ...initialBalances };
     try {
@@ -207,17 +230,21 @@ const App = () => {
     e.preventDefault();
     switch (_ticker) {
       case "dai":
-        // console.log(dai.options.address);
-        await dai.methods.faucet(account, 1000).send({ from: account });
+        dai &&
+          dai.options.address &&
+          (await dai.methods
+            //.faucet(account, "1000000000000000000")
+            .faucet(account, "1000")
+            .send({ from: account }));
         break;
       case "bat":
-        await bat.methods.faucet(account, 1000).send({ from: account });
+        await bat.methods.faucet(account, "1000").send({ from: account });
         break;
       case "rep":
-        await rep.methods.faucet(account, 1000).send({ from: account });
+        await rep.methods.faucet(account, "1000").send({ from: account });
         break;
       case "zrx":
-        await zrx.methods.faucet(account, 1000).send({ from: account });
+        await zrx.methods.faucet(account, "1000").send({ from: account });
         break;
       default:
         break;
@@ -252,7 +279,6 @@ const App = () => {
       default:
         break;
     }
-    updateBalances();
   }
 
   // initiate dex transfer of local funds to dex smart contract and update balances
@@ -358,8 +384,8 @@ const App = () => {
     const _currSells = await dex.methods
       .getOrders(library.utils.fromAscii(currTicker), 1)
       .call();
-    // console.log("currBuys", _currBuys);
-    // console.log("currSells", _currSells);
+    console.log("currBuys", _currBuys);
+    console.log("currSells", _currSells);
     setCurrBuys(_currBuys);
     setCurrSells(_currSells);
   }
@@ -371,167 +397,175 @@ const App = () => {
       <h1 className="text-center" style={{ margin: "10px 0 0 5px" }}>
         Cacao Dex
       </h1>
+      {approvedTickers && approvedTickers.length > 0
+        ? approvedTickers.map((_ticker) => (
+            <a
+              style={
+                currTicker == _ticker
+                  ? {
+                      textDecoration: "underline",
+                      fontWeight: "bold",
+                      marginLeft: "10px",
+                    }
+                  : { marginLeft: "10px" }
+              }
+              key={_ticker}
+              onClick={() => setCurrTicker(_ticker)}
+            >
+              {_ticker}
+            </a>
+          ))
+        : null}
+      <p style={{ paddingLeft: "10px" }}>
+        <span style={{ fontSize: "larger", fontWeight: "bold" }}>Account:</span>
+        {account
+          ? `${account.substring(0, 7)}...${account.substring(37, 42)} ${
+              dexAdmin === account ? "(admin)" : ""
+            }`
+          : null}
+      </p>
       {approvedTickers && approvedTickers.length > 0 ? (
-        approvedTickers.map((_ticker) => (
-          <a
-            style={
-              currTicker == _ticker
-                ? {
-                    textDecoration: "underline",
-                    fontWeight: "bold",
-                    marginLeft: "10px",
-                  }
-                : { marginLeft: "10px" }
-            }
-            key={_ticker}
-            onClick={() => setCurrTicker(_ticker)}
-          >
-            {_ticker}
-          </a>
-        ))
-      ) : (
+        <>
+          <p style={{ paddingLeft: "10px", margin: "0px" }}>
+            <span style={{ fontSize: "larger", fontWeight: "bold" }}>
+              Balances:
+            </span>
+            <button
+              onClick={updateBalances}
+              style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+            >
+              Update
+            </button>
+          </p>
+          <ul style={{ paddingLeft: "10px" }}>
+            <li style={{ listStyle: "none" }}>
+              Dai: {localBalances.dai} / {dexBalances.dai}{" "}
+              <button
+                onClick={(e) => fundWallet("dai", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Fund
+              </button>{" "}
+              <button
+                onClick={(e) => approveTransfer("dai", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Approve
+              </button>{" "}
+              <button
+                onClick={(e) => depositTokens("dai", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Deposit
+              </button>{" "}
+              <button
+                onClick={(e) => withdrawTokens("dai", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Withdraw
+              </button>
+            </li>
+            <li style={{ listStyle: "none" }}>
+              Bat: {localBalances.bat} / {dexBalances.bat}{" "}
+              <button
+                onClick={(e) => fundWallet("bat", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Fund
+              </button>{" "}
+              <button
+                onClick={(e) => approveTransfer("bat", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Approve
+              </button>{" "}
+              <button
+                onClick={(e) => depositTokens("bat", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Deposit
+              </button>{" "}
+              <button
+                onClick={(e) => withdrawTokens("bat", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Withdraw
+              </button>
+            </li>
+            <li style={{ listStyle: "none" }}>
+              Rep: {localBalances.rep} / {dexBalances.rep}{" "}
+              <button
+                onClick={(e) => fundWallet("rep", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Fund
+              </button>{" "}
+              <button
+                onClick={(e) => approveTransfer("rep", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Approve
+              </button>{" "}
+              <button
+                onClick={(e) => depositTokens("rep", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Deposit
+              </button>{" "}
+              <button
+                onClick={(e) => withdrawTokens("rep", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Withdraw
+              </button>
+            </li>
+            <li style={{ listStyle: "none" }}>
+              Zrx: {localBalances.zrx} / {dexBalances.zrx}{" "}
+              <button
+                onClick={(e) => fundWallet("zrx", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Fund
+              </button>{" "}
+              <button
+                onClick={(e) => approveTransfer("zrx", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Approve
+              </button>{" "}
+              <button
+                onClick={(e) => depositTokens("zrx", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Deposit
+              </button>{" "}
+              <button
+                onClick={(e) => withdrawTokens("zrx", e)}
+                style={{ border: "1px solid #aaa", borderRadius: "10px" }}
+              >
+                Withdraw
+              </button>
+            </li>
+          </ul>
+        </>
+      ) : dexAdmin === account ? (
         <div>
           <button
             onClick={approveTokens}
             style={{ border: "1px solid #aaa", borderRadius: "10px" }}
           >
-            Approve Tokens
+            Initialize Dex
           </button>{" "}
-          <button
-            onClick={getApprovedTokens}
+          {/* <button
+            onClick={updateTokenList}
             style={{ border: "1px solid #aaa", borderRadius: "10px" }}
           >
             Update List
-          </button>
+          </button> */}
         </div>
+      ) : (
+        <p>Dex contract uninitialized. Only admin can initialize the Dex.</p>
       )}
-      <p style={{ paddingLeft: "10px" }}>
-        <span style={{ fontSize: "larger", fontWeight: "bold" }}>Account:</span>
-        {account
-          ? `${account.substring(0, 7)}...${account.substring(37, 42)}`
-          : null}
-      </p>
-      <p style={{ paddingLeft: "10px", margin: "0px" }}>
-        <span style={{ fontSize: "larger", fontWeight: "bold" }}>
-          Balances:
-        </span>
-        <button
-          onClick={updateBalances}
-          style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-        >
-          Update
-        </button>
-      </p>
-      <ul style={{ paddingLeft: "10px" }}>
-        <li style={{ listStyle: "none" }}>
-          Dai: {localBalances.dai} / {dexBalances.dai}{" "}
-          <button
-            onClick={(e) => fundWallet("dai", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Fund
-          </button>{" "}
-          <button
-            onClick={(e) => approveTransfer("dai", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Approve
-          </button>{" "}
-          <button
-            onClick={(e) => depositTokens("dai", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Deposit
-          </button>{" "}
-          <button
-            onClick={(e) => withdrawTokens("dai", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Withdraw
-          </button>
-        </li>
-        <li style={{ listStyle: "none" }}>
-          Bat: {localBalances.bat} / {dexBalances.bat}{" "}
-          <button
-            onClick={(e) => fundWallet("bat", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Fund
-          </button>{" "}
-          <button
-            onClick={(e) => approveTransfer("bat", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Approve
-          </button>{" "}
-          <button
-            onClick={(e) => depositTokens("bat", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Deposit
-          </button>{" "}
-          <button
-            onClick={(e) => withdrawTokens("bat", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Withdraw
-          </button>
-        </li>
-        <li style={{ listStyle: "none" }}>
-          Rep: {localBalances.rep} / {dexBalances.rep}{" "}
-          <button
-            onClick={(e) => fundWallet("rep", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Fund
-          </button>{" "}
-          <button
-            onClick={(e) => approveTransfer("rep", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Approve
-          </button>{" "}
-          <button
-            onClick={(e) => depositTokens("rep", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Deposit
-          </button>{" "}
-          <button
-            onClick={(e) => withdrawTokens("rep", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Withdraw
-          </button>
-        </li>
-        <li style={{ listStyle: "none" }}>
-          Zrx: {localBalances.zrx} / {dexBalances.zrx}{" "}
-          <button
-            onClick={(e) => fundWallet("zrx", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Fund
-          </button>{" "}
-          <button
-            onClick={(e) => approveTransfer("zrx", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Approve
-          </button>{" "}
-          <button
-            onClick={(e) => depositTokens("zrx", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Deposit
-          </button>{" "}
-          <button
-            onClick={(e) => withdrawTokens("zrx", e)}
-            style={{ border: "1px solid #aaa", borderRadius: "10px" }}
-          >
-            Withdraw
-          </button>
-        </li>
-      </ul>
 
       {currTicker && currTicker != "DAI" ? (
         <div className="row" style={{ paddingLeft: "10px" }}>

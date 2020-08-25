@@ -5,7 +5,6 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
-
 contract Dex {
     using SafeMath for uint256;
     // enum to differentiate BUY and SELL Limit Orders
@@ -166,11 +165,20 @@ contract Dex {
                 balances[msg.sender][_ticker] >= _amount,
                 "insufficient funds"
             );
+            // subtract token balance prior to order filled
+            balances[msg.sender][_ticker] = balances[msg.sender][_ticker].sub(
+                _amount
+            );
         } else {
+            // (_side == Side.BUY)
             // if creating a buy order require account has sufficient DAI to fund purchase
             require(
                 balances[msg.sender][DAI] >= _amount.mul(_price),
                 "insufficient DAI balance"
+            );
+            // subtract DAI balance prior to order filled
+            balances[msg.sender][DAI] = balances[msg.sender][DAI].sub(
+                _amount.mul(_price)
             );
         }
 
@@ -210,31 +218,32 @@ contract Dex {
         // increment nextOrderId
         nextOrderId = nextOrderId.add(1);
 
-        matchOrders(_ticker, _amount, _side, _price, i);
+        matchOrders(_ticker, _amount, _side, false, _price, i);
     }
 
-    function createMarketOrder(bytes32 _ticker, uint256 _amount, Side _side)
-        external
-        tokenNotDai(_ticker)
-        tokenExists(_ticker)
-    {
+    function createMarketOrder(
+        bytes32 _ticker,
+        uint256 _amount,
+        Side _side
+    ) external tokenNotDai(_ticker) tokenExists(_ticker) {
         if (_side == Side.SELL) {
             // if creating a sell order require account has sufficient tokens to sell
             require(
                 balances[msg.sender][_ticker] >= _amount,
                 "insufficient funds"
             );
-            // if creating a buy order we need to check the price of each SELL order during order matching
+            // if MARKET BUY order we need to check the price of each SELL order during order matching
             // to verify the account has sufficient Dai to cover the transaction
         }
 
-        matchOrders(_ticker, _amount, _side, 0, 0);
+        matchOrders(_ticker, _amount, _side, true, 0, 0);
     }
 
     function matchOrders(
         bytes32 _ticker,
         uint256 _amount,
         Side _side,
+        bool isMarket,
         uint256 _price,
         uint256 _limitOrderId
     ) internal {
@@ -251,7 +260,8 @@ contract Dex {
         while (i < orders.length && remaining > 0) {
             // if limit order check prices match (this only works bcs orderbook is sorted by price)
             // else order is for best market price and sufficient balance was required in calling function
-            if (_price > 0) {
+            //if (_price > 0) {
+            if (!isMarket) {
                 if (_side == Side.BUY && orders[i].price > _price) break;
                 if (_side == Side.SELL && orders[i].price < _price) break;
             }
@@ -282,40 +292,64 @@ contract Dex {
                 orders[i].price,
                 now
             );
-            // update trader account balance
+
             if (_side == Side.SELL) {
                 // update sellers balances
-                balances[msg.sender][_ticker] = balances[msg.sender][_ticker]
-                    .sub(matched);
+                if (isMarket) {
+                    // if MARKET SELL: sender token balance was verified in createMarketOrder()
+                    // deduct token balance from sender's balance
+                    balances[msg.sender][_ticker] = balances[msg
+                        .sender][_ticker]
+                        .sub(matched);
+                }
+
+                // MARKET SELL: add DAI to sender's DAI balance
                 balances[msg.sender][DAI] = balances[msg.sender][DAI].add(
                     matched.mul(orders[i].price)
                 );
-                // update buyers balances
+
+                // MARKET SELL: add token to buyer's balance
                 balances[orders[i].trader][_ticker] = balances[orders[i]
                     .trader][_ticker]
                     .add(matched);
-                balances[orders[i].trader][DAI] = balances[orders[i]
-                    .trader][DAI]
-                    .sub(matched.mul(orders[i].price));
+
+                // if MARKET SELL: buyer must have created a LIMIT BUY order
+                // limit orders have balance deducted prior to order fulfillment
+                // balances[orders[i].trader][DAI] = balances[orders[i]
+                //      .trader][DAI]
+                //      .sub(matched.mul(orders[i].price));
             } else {
-                require(
-                    balances[msg.sender][DAI] >= matched.mul(orders[i].price),
-                    "buyer insufficient funds"
-                );
-                // update buyers balances
+                // (_side == Side.BUY)
+                if (isMarket) {
+                    // if MARKET BUY: require sender has sufficient DAI balance
+                    require(
+                        balances[msg.sender][DAI] >=
+                            matched.mul(orders[i].price),
+                        "buyer insufficient funds"
+                    );
+                    // if MARKET BUY: deduct DAI from sender's balance
+                    // limit orders have balance deducted prior to order fulfillment
+                    balances[msg.sender][DAI] = balances[msg.sender][DAI].sub(
+                        matched.mul(orders[i].price)
+                    );
+                }
+
+                // MARKET BUY: add tokens to sender's balance
                 balances[msg.sender][_ticker] = balances[msg.sender][_ticker]
                     .add(matched);
-                balances[msg.sender][DAI] = balances[msg.sender][DAI].sub(
-                    matched.mul(orders[i].price)
-                );
-                // update sellers balances
-                balances[orders[i].trader][_ticker] = balances[orders[i]
-                    .trader][_ticker]
-                    .sub(matched);
+
+                // if MARKET BUY then seller must have placed a LIMIT SELL order
+                // limit orders have balance deducted prior to order fulfillment
+                // balances[orders[i].trader][_ticker] = balances[orders[i]
+                //     .trader][_ticker]
+                //     .sub(matched);
+
+                // MARKET Buy: add DAI to seller's balance
                 balances[orders[i].trader][DAI] = balances[orders[i]
                     .trader][DAI]
                     .add(matched.mul(orders[i].price));
             }
+
             // increment iterators
             nextTradeId = nextTradeId.add(1);
             i = i.add(1);

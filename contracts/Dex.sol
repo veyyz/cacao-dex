@@ -54,6 +54,9 @@ contract Dex {
     /// @dev \var constant representation of DAI ticker for comparison (optimization)
     bytes32 constant DAI = bytes32("DAI");
 
+    /// @dev \var Flag used in circuit breaker that specifies whether the contract should stop executing
+    bool private stopped = false;
+
     /// @dev \var administrative account
     /// \fn By default Solidity exposes public getter function with the same name as public variables
     address public admin;
@@ -62,6 +65,16 @@ contract Dex {
     modifier onlyAdmin() {
         require(msg.sender == admin, "only admin");
         _;
+    }
+
+    /// @dev modifier that stops a contract method from being executed when the circuit breaker has been activated
+    modifier stopInEmergency {
+        if (!stopped) _;
+    }
+
+    /// @dev toggles circuit breaker which stops (or resumes) the execution of contract methods
+    function toggleContractActive() public onlyAdmin() {
+        stopped = !stopped;
     }
 
     /// @dev modifier validates token is approved for trading
@@ -137,6 +150,7 @@ contract Dex {
     function addToken(bytes32 _ticker, address _tokenAddress)
         external
         onlyAdmin()
+        stopInEmergency()
     {
         /// require token hasn't already been approved
         /// to-do: check that tokenAddress is a valid contract address
@@ -154,6 +168,7 @@ contract Dex {
     function deposit(uint256 _amount, bytes32 _ticker)
         external
         tokenExists(_ticker)
+        stopInEmergency()
     {
         IERC20(tokens[_ticker].tokenAddress).transferFrom(
             msg.sender,
@@ -171,6 +186,7 @@ contract Dex {
     function withdraw(uint256 _amount, bytes32 _ticker)
         external
         tokenExists(_ticker)
+        stopInEmergency()
     {
         /// require that the amount being withdrawn is <= the user's balance
         require(_amount <= balances[msg.sender][_ticker], "insufficient funds");
@@ -191,7 +207,7 @@ contract Dex {
         uint256 _amount,
         uint256 _price,
         Side _side
-    ) external tokenExists(_ticker) tokenNotDai(_ticker) {
+    ) external tokenExists(_ticker) tokenNotDai(_ticker) stopInEmergency() {
         if (_side == Side.SELL) {
             /// if creating a sell order require account has sufficient tokens to sell
             require(
@@ -257,12 +273,11 @@ contract Dex {
     /// @dev Creates a MARKET order and adds it to the order book
     /// @param _ticker Symbol of the token being traded
     /// @param _amount Amount of token being traded
-    /// @param _price Exchange rate for the token (in DAI)
     function createMarketOrder(
         bytes32 _ticker,
         uint256 _amount,
         Side _side
-    ) external tokenNotDai(_ticker) tokenExists(_ticker) {
+    ) external tokenNotDai(_ticker) tokenExists(_ticker) stopInEmergency() {
         if (_side == Side.SELL) {
             /// if creating a sell order require account has sufficient tokens to sell
             require(
@@ -290,7 +305,7 @@ contract Dex {
         bool _isMarket,
         uint256 _price,
         uint256 _limitOrderId
-    ) internal {
+    ) internal stopInEmergency() {
         /// get a storage pointer to the corresponding orders that can fill the trade
         Order[] storage orders = orderBook[_ticker][uint256(
             _side == Side.BUY ? Side.SELL : Side.BUY

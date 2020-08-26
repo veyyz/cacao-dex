@@ -914,12 +914,12 @@
     "5777": {
       "events": {},
       "links": {},
-      "address": "0x646045beD52F0Fb5a25A852Ed9C9C2E208AB2498",
-      "transactionHash": "0x5cf513be985e9925bf56e61fcf8ed730b69202aecd1acaf843783c87da227bec"
+      "address": "0xB1888fa86f4ABA8eED69539Bc57fA45B4335112C",
+      "transactionHash": "0xd80deb816770abc257c8751e2f3da61dec113c6c59722915c89555b44ddef644"
     }
   },
   "schemaVersion": "3.1.0",
-  "updatedAt": "2020-08-25T17:18:00.193Z",
+  "updatedAt": "2020-08-26T01:17:02.856Z",
   "networkType": "ethereum",
   "devdoc": {
     "methods": {}

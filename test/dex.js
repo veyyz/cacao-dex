@@ -216,4 +216,22 @@ contract("Dex", (accounts) => {
       "insufficient funds"
     );
   });
+
+  // 12.0 Should not create market order if account insufficient Token.
+  it("Should NOT accept deposit if circuit breaker has been activated", async () => {
+    await dai.faucet(accounts[0], 100000);
+    await dai.approve(dex.address, 100000, { from: accounts[0] });
+    const _balance0 = await dai.balanceOf(accounts[0]);
+
+    await dex.toggleCircuitBreaker();
+    await expectRevert(
+      dex.deposit(100000, DAI, { from: accounts[0] }),
+      "Contract paused."
+    );
+    await dex.toggleCircuitBreaker();
+
+    const balance0 = await dai.balanceOf(accounts[0]);
+
+    assert(_balance0.toString() === balance0.toString());
+  });
 });

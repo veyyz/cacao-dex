@@ -68,12 +68,13 @@ contract Dex {
     }
 
     /// @dev modifier that stops a contract method from being executed when the circuit breaker has been activated
-    modifier stopInEmergency {
-        if (!stopped) _;
+    modifier stopInEmergency() {
+        require(!stopped, "Contract paused.");
+        _;
     }
 
     /// @dev toggles circuit breaker which stops (or resumes) the execution of contract methods
-    function toggleContractActive() public onlyAdmin() {
+    function toggleCircuitBreaker() public onlyAdmin() {
         stopped = !stopped;
     }
 

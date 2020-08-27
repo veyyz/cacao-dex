@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useWeb3Context } from "web3-react";
 
-import Dex from "./contracts/Dex.json";
+import Proxy from "./contracts/Proxy.json";
+import Delegate from "./contracts/Dex.json";
 import Dai from "./contracts/Dai.json";
 import Bat from "./contracts/Bat.json";
 import Rep from "./contracts/Rep.json";
@@ -68,19 +69,24 @@ const App = () => {
       if (!networkId) return null;
 
       try {
+        // get network Idinstantiate contract references
         // context.networkId is actually the chainId
         // so need to get networkId from library
         const netId = await library.eth.net.getId();
-        const deployedDex = Dex.networks[netId];
+        // don't need ref to deployed delegate bcs calls will be proxied
+        // const deployedDelegate = Delegate.networks[netId];
+        const deployedProxy = Proxy.networks[netId];
         const deployedDai = Dai.networks[netId];
         const deployedBat = Bat.networks[netId];
         const deployedRep = Rep.networks[netId];
         const deployedZrx = Zrx.networks[netId];
 
-        // instantiate contract refs
+        // Proxied Dex Contract Reference
+        // Instantiated with ABI of Delegate Contract (Dex.sol)
+        // and address of Proxy Contract
         const contractDex = new library.eth.Contract(
-          Dex.abi,
-          deployedDex && deployedDex.address
+          Delegate.abi,
+          deployedProxy && deployedProxy.address
         );
         setDex(contractDex);
 
@@ -131,8 +137,8 @@ const App = () => {
 
   // update token balances after token contracts are loaded
   useEffect(() => {
-    // if (dai && bat && rep && zrx) updateBalances();
-  }, [dai, bat, rep, zrx]);
+    if (dai && bat && rep && zrx) updateBalances();
+  }, [account, dai, bat, rep, zrx]);
 
   // update orderbook when currTicker changes
   useEffect(() => {

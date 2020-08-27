@@ -1,10 +1,7 @@
 const { expectRevert } = require("@openzeppelin/test-helpers");
 
-// Our dEx will interact with several tokens already deployed to the network.
-// To simulate this we will deploy mock tokens to our network to test our dEx.
-// 0. Import our dEx contract
-const Dex = artifacts.require("Dex.sol");
-// 1. Import our mock token contracts
+const Proxy = artifacts.require("Proxy.sol");
+const Delegate = artifacts.require("Dex.sol");
 const Dai = artifacts.require("mocks/Dai.sol");
 const Bat = artifacts.require("mocks/Bat.sol");
 const Rep = artifacts.require("mocks/Rep.sol");
@@ -15,45 +12,53 @@ const [DAI, BAT, REP, ZRX] = ["DAI", "BAT", "REP", "ZRX"].map((_symbol) =>
   web3.utils.fromAscii(_symbol)
 );
 
-// 2. Define our test block and hooks
-contract("Dex (Cleanroom)", (accounts) => {
-  let dai, bat, rep, zrx;
-  // Setup before each test
-  // 3. Deploy fresh mock token contracts
-  // 4. Deploy a fresh dEx contract
+const seedTraderWallets = async (trader, token, dex) => {
+  await token.faucet(trader, 100000);
+  await token.approve(dex.address, 100000, { from: trader });
+};
+
+/// @dev tests proxy deployment and delegated function calls (contract initialization occurs locally (in this file)
+/// differs from `proxy-methods.js` tests where contract initialization is handled by truffle in `2_deploy_contracts.js`
+/// it's ok for these tests to fail if all of the tests in `proxy-methods.js` pass
+contract("Proxy (Methods only test)", async (accounts) => {
+  console.log(
+    "**IMPORTANT** The tests in `proxy-deployment.js` must pass before a production deployment, in which case these will fail."
+  );
+  console.log(
+    "NOTE: These tests are designed to redeploy and initialize the proxy contract (and refresh balances) before each use case,",
+    "meaning they will intentionally fail when contract deployment is configured by `2_deploy_contracts.js`"
+  );
+
+  let proxy, delegate, dex, dai, bat, rep, zrx;
+
   beforeEach(async () => {
-    [dai, bat, rep, zrx, dex] = await Promise.all([
-      Dai.new(),
-      Bat.new(),
-      Rep.new(),
-      Zrx.new(),
-      Dex.new(),
-    ]);
+    delegate = await Delegate.deployed(); /// get deployed instance of delegate contract (Dex.sol)
+    proxy = await Proxy.new(); /// create a new proxy instance
+    await proxy.upgradeDelegate(delegate.address); /// initialize proxy to delegateCalls to delegate contract (Dex.sol)
+    dex = await Delegate.at(proxy.address); /// create a refernce to delegate contract using the proxy's address
 
-    // 5. Approve mock tokens for trading on Dex
-    await Promise.all([
-      dex.addToken(DAI, dai.address),
-      dex.addToken(BAT, bat.address),
-      dex.addToken(REP, rep.address),
-      dex.addToken(ZRX, zrx.address),
+    /// get deployed instances of mock ERC20 contracts
+    [dai, bat, rep, zrx] = await Promise.all([
+      Dai.deployed(),
+      Bat.deployed(),
+      Rep.deployed(),
+      Zrx.deployed(),
     ]);
-
-    const seedTraderWallets = async (trader, token) => {
-      // 6. Allocate initial balances of ERC20 tokens to 'traders' accounts
-      await token.faucet(trader, 100000);
-      // 7. Approve Dex contract to transact on behalf of 'traders'
-      await token.approve(dex.address, 100000, { from: trader });
-    };
 
     await Promise.all([
-      seedTraderWallets(accounts[0], dai),
-      seedTraderWallets(accounts[1], bat),
-      seedTraderWallets(accounts[2], rep),
-      seedTraderWallets(accounts[3], zrx),
+      dex.addToken(DAI, dai.address, { from: accounts[0] }),
+      dex.addToken(BAT, bat.address, { from: accounts[0] }),
+      dex.addToken(REP, rep.address, { from: accounts[0] }),
+      dex.addToken(ZRX, zrx.address, { from: accounts[0] }),
     ]);
 
-    // deposit token balances to the dex wallet
-    // Test 8.1 verifies the deposit was successful
+    await Promise.all([
+      seedTraderWallets(accounts[0], dai, dex),
+      seedTraderWallets(accounts[1], bat, dex),
+      seedTraderWallets(accounts[2], rep, dex),
+      seedTraderWallets(accounts[3], zrx, dex),
+    ]);
+
     await Promise.all([
       dex.deposit(100000, DAI, { from: accounts[0] }),
       dex.deposit(100000, BAT, { from: accounts[1] }),
@@ -62,22 +67,37 @@ contract("Dex (Cleanroom)", (accounts) => {
     ]);
   });
 
-  // Wallet Tests
-  // 8. Deposit
-  // 8.1 Should deposit tokens that are approved for trading on dEx.
+  it("should deploy to the network and have an address", async () => {
+    assert(
+      web3.utils.isAddress(proxy.address),
+      "Contract does not have a valid address"
+    );
+    assert(
+      web3.utils.isAddress(delegate.address),
+      "Contract does not have a valid address"
+    );
+  });
+
+  it("should update the delegate contract address", async () => {
+    const _delegate = await proxy.delegate();
+    assert(_delegate === delegate.address, "Delegate not set");
+  });
+
+  it("should approve tokens for trading", async () => {
+    const tokens = await dex.getTokenList();
+    assert(
+      tokens.length == 4,
+      `Expected tokens.length == 4 and got tokens.length == ${tokens.length}`
+    );
+  });
+
   it("should accept deposit of approved ERC20 tokens", async () => {
-    let balances = [];
-    try {
-      balances = await Promise.all([
-        dex.balances(accounts[0], DAI),
-        dex.balances(accounts[1], BAT),
-        dex.balances(accounts[2], REP),
-        dex.balances(accounts[3], ZRX),
-      ]);
-    } catch (e) {
-      console.log(e.message);
-      assert(false);
-    }
+    const balances = await Promise.all([
+      dex.balances(accounts[0], DAI),
+      dex.balances(accounts[1], BAT),
+      dex.balances(accounts[2], REP),
+      dex.balances(accounts[3], ZRX),
+    ]);
 
     balances.map((balance) => assert(balance.toString() === "100000"));
   });

@@ -2,7 +2,7 @@ const { expectRevert } = require("@openzeppelin/test-helpers");
 
 const Dai = artifacts.require("mocks/Dai.sol");
 
-contract("Dai", async (accounts) => {
+contract("Mock ERC20", async (accounts) => {
   let dai;
 
   beforeEach(async () => {

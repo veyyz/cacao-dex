@@ -1,13 +1,37 @@
 pragma solidity >=0.6.3 <0.7.0;
 pragma experimental ABIEncoderV2;
 
-// OpenZeppellin interface to interact with external ERC20 token contracts
+/// OpenZeppellin interface to interact with external ERC20 token contracts
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
 /** @title Cacao/io Decentralized Exchange */
 contract Dex {
     using SafeMath for uint256;
+
+    /// NOTE: It's EXTREMELY IMPORTANT to make sure `delegate` and `admin` are the first two variables
+    /// declared in the contract. Declaring any new variables before or between the two will cause
+    /// the contract's memory layout to lose sync with the proxy contract and cause SERIOUS PROBLEMS.
+
+    /** DO NOT DECLARE ANY NEW VARIABLES HERE ********************************************************/
+
+    /// @dev \var placeholder to keep memory layout in sync with the proxy contract
+    address public delegate;
+
+    /** DO NOT DECLARE ANY NEW VARIABLES HERE ********************************************************/
+
+    /// @dev \var administrative account
+    /// \fn By default Solidity exposes public getter function with the same name as public variables
+    address public admin;
+
+    /** DO NOT DECLARE ANY NEW VARIABLES HERE (JUST TO BE CAREFUL) ***********************************/
+
+    /// @dev Constructor that initializes admin to the creator of the contract
+    constructor() public {
+        admin = msg.sender;
+    }
+
+    /** OK TO START DECLARING NEW VARIABLES AFTER THIS COMMENT ***************************************/
 
     /// @dev \enum to differentiate BUY and SELL Limit Orders
     enum Side {BUY, SELL}
@@ -56,10 +80,6 @@ contract Dex {
 
     /// @dev \var Flag used in circuit breaker that specifies whether the contract should stop executing
     bool private stopped = false;
-
-    /// @dev \var administrative account
-    /// \fn By default Solidity exposes public getter function with the same name as public variables
-    address public admin;
 
     /// @dev access control modifier for admin only functions
     modifier onlyAdmin() {
@@ -114,11 +134,6 @@ contract Dex {
         uint256 _price,
         uint256 _date
     );
-
-    /// @dev Constructor that initializes admin to the creator of the contract
-    constructor() public {
-        admin = msg.sender;
-    }
 
     /// @dev Gets the orderbook for display on the frontend
     /// @param _ticker Symbol of token
@@ -383,6 +398,9 @@ contract Dex {
                 /// (_side == Side.BUY)
                 if (_isMarket) {
                     /// if MARKET BUY: require sender has sufficient DAI balance
+                    /// Decision was made to explicity reject market orders that can't
+                    /// be immediately executed for simplicity of demonstration. In the
+                    /// real world market orders might stick around for a specified time.
                     require(
                         balances[msg.sender][DAI] >=
                             matched.mul(orders[i].price),

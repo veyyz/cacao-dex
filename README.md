@@ -38,14 +38,14 @@ Decentralized Exchange for ERC20 using Truffle, React, and @web3-react
 
 ### Contract Initialization
 
-On first run, contract will need to be initialized with approved trading pairs
+<!-- On first run, contract will need to be initialized with approved trading pairs
 
 - In MetaMask, select "Account 1" or the account that you deployed the contract with.
 - You should see "(admin)" next to the account address and a button that says "Initialize Contract"
 - Otherwise you will see a message reading "Only admin can initialize the Dex Contract"
-- Click on "Initialize Contract"
+- Click on "Initialize Contract" -->
 
-Note: Trading pairs are hardcoded, in the future they could be added via a form that takes the contract details.
+Note: Trading pairs are hardcoded in the truffle deployment script (`2_deploy_contracts.js`). In the future they could be added via a form that takes the contract details.
 
 ### Fund Wallets and Trade
 
@@ -70,14 +70,15 @@ Tip: App.js console logs the {"\_tickers"} object for your convenience.
 
 ## Features
 
-### Admin
+### Security
 
-- Approve Trading Pairs
-- Seed Wallets from Faucet
+- Contract Upgradability
+- Circuit Breaker
 - Admin UI Trimming
 
 ### Wallet
 
+- Seed Wallets from Faucet
 - Approve Dex to transferFrom
 - Deposit Tokens to Contract
 - Withdraw tokens to Local Wallet

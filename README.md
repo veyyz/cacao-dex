@@ -73,7 +73,7 @@ Tip: App.js console logs the {"\_tickers"} object for your convenience.
 ### Security
 
 - Contract Upgradability
-- Circuit Breaker
+- Circuit Breaking
 - Admin UI Trimming
 
 ### Wallet
@@ -95,6 +95,7 @@ Tip: App.js console logs the {"\_tickers"} object for your convenience.
 
 <img src="https://cacao-io-test.s3.amazonaws.com/cacao-dex-tests.png"></img>
 
-## Screenshot
+## 📸
 
-<img src="https://cacao-io-test.s3.amazonaws.com/cacao-dex-scrshot.png"></img>
+<img src="https://cacao-io-test.s3.amazonaws.com/cacao-dex-on.png"></img>
+<img src="https://cacao-io-test.s3.amazonaws.com/cacao-dex-off.png"></img>

@@ -93,7 +93,7 @@ Tip: App.js console logs the {"\_tickers"} object for your convenience.
 
 ## Tests
 
-<img src="https://cacao-io-test.s3.amazonaws.com/cacao-dex-tests.png"></img>
+<img src="https://cacao-io-test.s3.amazonaws.com/cacao-dex-new-tests.png"></img>
 
 ## Screenshots 📸
 

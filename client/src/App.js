@@ -20,9 +20,11 @@ const initialBalances = Object.freeze({
 const App = () => {
   // contract reference and state
   const [dex, setDex] = useState(undefined);
+  const [isAlive, setAlive] = useState(false);
   const [dexAdmin, setDexAdmin] = useState();
   const [approvedTickers, setApprovedTickers] = useState([]);
   const [currTicker, setCurrTicker] = useState(undefined);
+  const [formError, setFormError] = useState();
 
   // order book & balances
   const [currSide, setCurrSide] = useState("Limit");
@@ -121,18 +123,27 @@ const App = () => {
     loadContracts();
   }, [context]);
 
+  const getDexAlive = async () => {
+    const _isAlive = await dex.methods.isAlive().call();
+    setAlive(_isAlive);
+  };
+
+  const getAdmin = async () => {
+    try {
+      const _dexAdmin = await dex.methods.admin().call();
+      setDexAdmin(_dexAdmin);
+    } catch (e) {
+      console.error("Error getting Dex Admin:", e.message);
+    }
+  };
+
   // update list of approved tokens on dex is loaded
   useEffect(() => {
-    const getAdmin = async () => {
-      try {
-        const _dexAdmin = await dex.methods.admin().call();
-        setDexAdmin(_dexAdmin);
-      } catch (e) {
-        console.error("Error getting Dex Admin:", e.message);
-      }
-    };
     if (dex && !dexAdmin) getAdmin();
-    if (dex && dex.options.address) updateTokenList();
+    if (dex && dex.options.address) {
+      getDexAlive();
+      updateTokenList();
+    }
   }, [dex]);
 
   // update token balances after token contracts are loaded
@@ -144,6 +155,16 @@ const App = () => {
   useEffect(() => {
     if (dex && dex.options.address != 0) updateOrderBook();
   }, [currTicker]);
+
+  async function toggleCircuitBreaker() {
+    console.log("toggleCircuitBreaker()");
+    try {
+      await dex.methods.toggleCircuitBreaker().send({ from: account });
+      getDexAlive();
+    } catch (e) {
+      console.error("Error toggling circuit breaker. Freak out.");
+    }
+  }
 
   // admin only method - run on dex initialization only
   async function approveTokens() {
@@ -350,20 +371,24 @@ const App = () => {
   // create limit order on order book
   async function createLimitOrder(e) {
     e.preventDefault();
+    setFormError("");
     const side = e.target.elements[0].value;
     const amount = e.target.elements[1].value;
     const price = e.target.elements[2].value;
-    await dex.methods
-      .createLimitOrder(
-        library.utils.fromAscii(currTicker),
-        amount,
-        price,
-        side
-      )
-      .send({ from: account });
-
-    await updateBalances();
-    await updateOrderBook();
+    try {
+      await dex.methods
+        .createLimitOrder(
+          library.utils.fromAscii(currTicker),
+          amount,
+          price,
+          side
+        )
+        .send({ from: account });
+      await updateBalances();
+      await updateOrderBook();
+    } catch (e) {
+      setFormError(e.message);
+    }
   }
 
   // create market order on order book
@@ -373,14 +398,19 @@ const App = () => {
   // ---> balances will be updated to reflect transfer
   async function createMarketOrder(e) {
     e.preventDefault();
+    setFormError("");
     const side = e.target.elements[0].value;
     const amount = e.target.elements[1].value;
-    await dex.methods
-      .createMarketOrder(library.utils.fromAscii(currTicker), amount, side)
-      .send({ from: account });
+    try {
+      await dex.methods
+        .createMarketOrder(library.utils.fromAscii(currTicker), amount, side)
+        .send({ from: account });
 
-    await updateBalances();
-    await updateOrderBook();
+      await updateBalances();
+      await updateOrderBook();
+    } catch (e) {
+      setFormError(e.message);
+    }
   }
 
   async function updateOrderBook() {
@@ -400,9 +430,52 @@ const App = () => {
     <div>Loading Web3, accounts, and contract...</div>
   ) : (
     <div className="container">
-      <h1 className="text-center" style={{ margin: "10px 0 0 5px" }}>
-        Cacao Dex
-      </h1>
+      <div
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          margin: "10px 0 0 5px",
+        }}
+      >
+        <span
+          style={{ flex: 1 }}
+          className="text-center"
+          style={{
+            fontSize: "2em",
+            fontWeight: "bold",
+          }}
+        >
+          {`Cacao Dex`}
+        </span>
+        <img
+          style={{
+            flex: 1,
+            height: "2em",
+            width: "2em",
+            position: "relative",
+            top: ".25em",
+          }}
+          onClick={dexAdmin === account ? toggleCircuitBreaker : null}
+          alt={isAlive ? "Online" : "Paused"}
+          src={
+            isAlive
+              ? "https://twemoji.maxcdn.com/v/13.0.1/72x72/1f4a1.png"
+              : "https://twemoji.maxcdn.com/v/13.0.1/72x72/1f50c.png"
+          }
+        />
+      </div>
+      {!isAlive && (
+        <div>
+          <span
+            style={{
+              fontSize: "smaller",
+              color: "red",
+            }}
+          >
+            Contract temporarily paused by administrator.
+          </span>
+        </div>
+      )}
       {approvedTickers && approvedTickers.length > 0
         ? approvedTickers.map((_ticker) => (
             <a
@@ -646,6 +719,16 @@ const App = () => {
               >
                 Submit
               </button>
+              {formError && (
+                <span
+                  style={{
+                    fontSize: "smaller",
+                    color: "red",
+                  }}
+                >
+                  {`  ${formError.slice(0, 64)}...`}
+                </span>
+              )}
             </form>
           </div>
         </div>

@@ -98,6 +98,11 @@ contract Dex {
         stopped = !stopped;
     }
 
+    /// @dev returns if contract is alive or stopped
+    function isAlive() public view returns (bool) {
+        return !stopped;
+    }
+
     /// @dev modifier validates token is approved for trading
     /// @param _ticker Token symbol to be traded
     modifier tokenExists(bytes32 _ticker) {

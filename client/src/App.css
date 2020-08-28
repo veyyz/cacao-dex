@@ -20,3 +20,9 @@
 .App-link {
   color: #09d3ac;
 }
+
+.container {
+  min-height: 750px;
+  max-width: 1125px;
+  border: 1px solid #333;
+}

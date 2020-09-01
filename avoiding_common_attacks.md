@@ -2,9 +2,9 @@
 
 Cacao Dex was designed to protect against basic Reenterancy and Integer Overflow/Underflow attacks.
 
-External calls are only used in the deposit and withdraw method of the contract. Special attention has been taken not to make external function calls in a way they could result in the hijacking of the execution thread and open the contract up to a reentrancy attack. In the deposit function the external call is made before the internal ledger is updated, so if the execution thread is hijacked the attacker's balance will still be 0. In the withdraw function the external call is made after the user's balance has been deducted from the internal ledger, so an attacker cannot hijack the execution and make repeated withdrawls on the same balance.
+External calls are only used in the `deposit()` and `withdraw()` methods of the contract. Special attention has been taken not to make external function calls in a way they could result in the hijacking of the execution thread and open the contract up to a reentrancy attack. In the `deposit()` function the external call is made before the internal ledger is updated, so if the execution thread is hijacked the attacker's balance will still be 0. In the `withdraw()` function the external call is made after the user's balance has been deducted from the internal ledger, so an attacker cannot hijack the execution and make repeated withdrawls on the same balance.
 
-Cacao Dex relies on the @openzeppelin-contracts implementation of SafeMath to defend against an Integer Overflow or Underflow attack. This library has >8000 stars on github and >12000 weekly installs over npm.
+Cacao Dex relies on the `@openzeppelin/openzeppelin-contracts` implementation of `SafeMath.sol` to defend against an Integer Overflow or Underflow attack. This library has >8000 stars on github and >12000 weekly installs over npm.
 
 Cacao Dex does not rely on any timestamps for calculations.
 

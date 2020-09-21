@@ -3,3 +3,4 @@ client/node_modules
 client/src/contracts
 contracts/Dex
 contracts/Multisig.sol
+build

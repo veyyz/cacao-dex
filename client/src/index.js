@@ -11,6 +11,7 @@ import Web3 from "web3";
 
 const networks = {
   1337: { name: "Local" },
+  42: { name: "Kovan" },
   4: { name: "Ropsten" },
   1: { name: "Mainnet" },
 };
@@ -20,7 +21,7 @@ console.log({ supportedNetworks });
 const { InjectedConnector, NetworkOnlyConnector } = Connectors;
 const MetaMask = new InjectedConnector({ supportedNetworks });
 const Infura = new NetworkOnlyConnector({
-  providerURL: "https://mainnet.infura.io/v3/727fb6ad8d4449a18315a17a79131cc7",
+  providerURL: "https://kovan.infura.io/v3/7c39de7d94824ae7bd7b45c9f67093bc",
 });
 const connectors = { MetaMask, Infura };
 

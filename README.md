@@ -2,6 +2,9 @@
 
 Decentralized Exchange for ERC20 using Truffle, React, and @web3-react
 
+### Demo
+[https://youtu.be/AvDLvoBHsk8](https://youtu.be/AvDLvoBHsk8)
+
 ### Frontend
 
 - React (w/ Hooks)
